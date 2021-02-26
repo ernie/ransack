@@ -14,6 +14,7 @@
   PR [1172](https://github.com/activerecord-hackery/ransack/pull/1172)
 
 * Fix for ActiveRecord 5.2.4 (note security fix in 5.2.4.2 for ActiveView's escape_javascript CVE-2020-5267 for all earlier versions)
+* Fix issue where negative predicates with associated_collection does not use the correct primary key for subquery.
 
 * Drop support for ActiveRecord older than 5.2.4.
   PR [1166](https://github.com/activerecord-hackery/ransack/pull/1166)
