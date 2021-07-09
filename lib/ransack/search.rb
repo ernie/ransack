@@ -49,6 +49,8 @@ module Ransack
           add_scope(key, value)
         elsif !Ransack.options[:ignore_unknown_conditions] || !@ignore_unknown_conditions
           raise ArgumentError, "Invalid search term #{key}"
+        elsif polymorphic_method = construct_polymorphic_parameter(key)
+          base.send("#{polymorphic_method}=", value)
         end
       end
       self
@@ -105,6 +107,8 @@ module Ransack
         else
           @scope_args[method_name]
         end
+      elsif polymorphic_method = construct_polymorphic_parameter(method_id.to_s)
+        base.send(polymorphic_method, *args)
       else
         super
       end
@@ -183,6 +187,29 @@ module Ransack
       end
 
       attrs
+    end
+
+    def construct_polymorphic_parameter(key)
+      # Handle polymorphic search. A new parameter will be created to
+      # replace the old invalid one.
+      conditions = []
+      predicate = Predicate.detect_from_string(key)
+      # Search all the models to find ones that are associated.
+      ActiveRecord::Base.descendants.each do |model|
+        next if model.name == 'ApplicationRecord'
+        next if model.name == @context.klass.name
+        model.reflect_on_all_associations.each do |association|
+          next if association.options[:as].blank?
+          next unless key =~ /#{association.options[:as]}/
+          able = association.options[:as].to_s
+          column_name = key.gsub("#{able}_", '').gsub("_#{predicate}", '')
+          next unless model.column_names.include? column_name
+          # FIXME: For the time being, disable models under namespace.
+          next if model.name =~ /::/ or not model.name
+          conditions << "#{able}_of_#{model.name}_type_#{column_name}"
+        end
+      end
+      "#{conditions.join('_or_')}_#{predicate}" unless conditions.empty?
     end
 
   end
